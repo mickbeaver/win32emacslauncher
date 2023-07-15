@@ -1,79 +1,40 @@
 #include <windows.h>
-#include <process.h>
 #include <cassert>
-#include <cerrno>
 #include <vector>
 #include <string>
-#include <fstream>
 
-void launchProcess(std::vector<std::wstring> &arguments)
+int WINAPI wWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, PWSTR pCmdLine, int nCmdShow)
 {
-	std::vector<wchar_t const *> processArgs;
+	std::wstring newCommandLine{L"emacsclientw.exe --alternate-editor=runemacs.exe --no-wait "};
+	newCommandLine.append(pCmdLine);
 
-	for (std::vector<std::wstring>::const_iterator it = arguments.begin();
-		 it != arguments.end();
-		 ++it)
-	{
-		processArgs.push_back(it->c_str());
-	}
-	processArgs.push_back(NULL);
-
-	intptr_t processHandle = _wspawnvp(_P_NOWAIT, processArgs[0], &processArgs[0]);
-	if (processHandle == -1)
-	{
-		int lastErrno = errno;
-		// Do something with the error.
-		assert(0);
-	}
-}
-
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
-{
-	std::vector<std::wstring> stringArgs;
-	INT numOriginalArgs = 0;
-	LPWSTR *originalArgv = CommandLineToArgvW(GetCommandLineW(), &numOriginalArgs);
-
-	
-	stringArgs.push_back(L"emacsclientw.exe");
-	stringArgs.push_back(L"--alternate-editor=runemacs.exe");
-	stringArgs.push_back(L"--no-wait");
-	if (numOriginalArgs > 1)
-	{
-		for (INT i = 1; i < numOriginalArgs; ++i)
-		{
-			// Add quotes around an argument containing a space
-			std::wstring argument(originalArgv[i]);
-			if (argument.find(L" ") != std::wstring::npos)
-			{
-				argument.insert(0, L"\"");
-				argument.append(L"\"");
-			}
-			stringArgs.push_back(argument);
-		}
-	}
-	else
-	{
-		// Adding an empty quotes string seems to do the right thing
-		// when there are no arguments to this wrapper.
-		stringArgs.push_back(L"\"\"");
+	// In the case of no arguments to this program, we pass a blank argument to emacsclient.
+	// This will start an empty emacs instance instead of showing an error message.
+	if (wcslen(pCmdLine) == 0) {
+		newCommandLine.append(LR"("")");
 	}
 
-#ifdef _DEBUG
-	std::wstring logFilename(originalArgv[0]);
-	logFilename.append(L".log");
-	std::wofstream logFile;
+	// CreateProcessW modifies the command line argument, so we need a writable buffer
+	std::vector<wchar_t> commandLineBuffer;
+	commandLineBuffer.resize(newCommandLine.length() + 1);
+	wcsncpy(commandLineBuffer.data(), newCommandLine.data(), commandLineBuffer.size());
 
-	logFile.open(logFilename.c_str());
-	for (std::vector<std::wstring>::const_iterator it = stringArgs.begin();
-		 it != stringArgs.end();
-		 ++it)
-	{
-		logFile << *it << L"\n";
-	}
-	logFile.close();
-#endif
+	STARTUPINFOW si{};
+	si.cb = sizeof(si);
+	PROCESS_INFORMATION pi{};
 
-	launchProcess(stringArgs);
+	BOOL retval = CreateProcessW(
+		NULL,
+		commandLineBuffer.data(),
+		NULL,
+		NULL,
+		FALSE,
+		CREATE_NEW_PROCESS_GROUP,
+		NULL,
+		NULL,
+		&si,
+		&pi);
+	assert(retval);
 
 	return 0;
 }

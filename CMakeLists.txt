@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.26)
 
 # TODO Add support for building with MinGW. For now, this is what I did:
 #   x86_64-w64-mingw32-windres.exe edit.rc edit.o
